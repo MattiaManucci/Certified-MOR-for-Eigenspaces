@@ -46,7 +46,7 @@ If you use this project for academic work, please consider citing our
 
     M. Manucci, B. Stamm, Z. Zeng
     Certified Model Order Reduction for parametric Hermitian eigenproblems
-    ArXiv e-print ..., 2025.
+    ArXiv e-print 2504.02672, 2025.
     
 ## License
 Distributed under the MIT License. See `LICENSE` for more information.
@@ -63,11 +63,11 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 
 
-[doi-shield]: https://img.shields.io/badge/DOI-10.5281%20%2F%20zenodo.13254480-blue.svg?style=for-the-badge
-[doi-url]: ....
+[doi-shield]: https://img.shields.io/badge/DOI-10.5281%20%2F%20zenodo.15106369-blue.svg?style=for-the-badge
+[doi-url]: https://doi.org/10.5281/zenodo.15106369
 [link-drive]: https://drive.google.com/file/d/1Y-RDkTQOvLaeccjgYzoq_qsD4tQLqN5u/view?usp=sharing
-[arxiv-shield]: https://img.shields.io/badge/arXiv-2204.13474-b31b1b.svg?style=for-the-badge
-[arxiv-url]: ....
+[arxiv-shield]: https://img.shields.io/badge/arXiv-2504.02672-b31b1b.svg?style=for-the-badge
+[arxiv-url]: https://doi.org/10.48550/arXiv.2504.02672
 
 [Ref1]: https://doi.org/10.1137/15M1017181
 [Ref2]: https://doi.org/10.1137/130933472
