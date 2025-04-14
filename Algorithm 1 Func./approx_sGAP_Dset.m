@@ -45,11 +45,6 @@ if isfield(options,'tol_trunc')
 else
     tol_trunc = tol*1e-2; 
 end
-if isfield(options,'flag_PC')
-    flag_PC = options.flag_PC;
-else
-    flag_PC = 0; 
-end
 
 
 ff=[];
@@ -95,10 +90,12 @@ end
 pars.mu=mulist;
 P = [];
 ne = zeros(1,num_init_inter);
+ne1 = zeros(1,num_init_inter);
 eiglist = cell(1,num_init_inter);
 for j = 1:num_init_inter
     
     ne(j)=2;
+    ne1(j)=1;
     mu = mulist(:,j);
     thetanew = theta(mu);    
     thetalist(j,:) = thetanew;
@@ -115,12 +112,14 @@ for j = 1:num_init_inter
             [V,D] = eigs(Amu,10*ne(j)+1,'smallestreal',opts);
         end
         E2=ne(j)+1;
+        ne1(j)=ne(j);
         while (abs(D(E2,E2)-D(ne(j)+1,ne(j)+1)))<options.RSG_tol
             ne(j)=ne(j)+1;
             [V,D] = eigs(Amu,10*ne(j)+1,'smallestreal',opts);
         end
 
         Pext = V(:,1:ne(j));
+        Pext1 = V(:,1:ne1(j));
         eiglist{j} = [diag(D(1:ne(j)+1,1:ne(j)+1))];
        
     else
@@ -133,22 +132,26 @@ for j = 1:num_init_inter
            end
         end
         E2=ne(j)+1;
+        ne1(j)=ne(j);
         for i=1:n
            if abs((eigAj(E2)- eigAj(ne(j)+1)))>options.RSG_tol 
                ne(j)=i+1;
                break
            end
         end
-        Pext = V(:,inds(1:ne(j)));  
+        Pext = V(:,inds(1:ne(j))); 
+        Pext1 = V(:,inds(1:ne1(j))); 
         eiglist{j} = [diag(D(1:ne(j)+1,1:ne(j)+1))];
     end
     P = [P Pext];
     pars.eigvecs{j} = Pext;
+    pars.eigvecs1{j} = Pext1;
 end
 
 [P,~] = qr(P,0);
 for j=1:numel(pars.eigvecs)
     pars.premult{j}=pars.eigvecs{j}'*P;
+    pars.premult1{j}=pars.eigvecs1{j}'*P;
 end
 iter = num_init_inter+1;
 AP=cell(kappa,1); PA1=cell(kappa,1); PA2{j}=cell(kappa,1);
@@ -178,6 +181,7 @@ Ntrain_bis= Ntrain; mu_t_bis=mu_t;
 ff2=[]; mulist2=[];
 while (curerror > tol)    
     ne(iter)=2;
+    ne1(iter)=1;
     for j = 1:kappa
         if iter==(num_init_inter+1)
             AP{j} = P'*A{j}*P;
@@ -201,8 +205,6 @@ while (curerror > tol)
             AP2{kappa*(j-1)+jj} = PA2{jj}*PA1{j};
         end
     end
-
-
     for j = 1:kappa
         for jj=1:(j-1)
             AP2{kappa*(j-1)+jj} = AP2{kappa*(jj-1)+j}';
@@ -212,20 +214,14 @@ while (curerror > tol)
     pars.A = AP;
     pars.Afull = AP2;
     pars.ne = ne;
+    pars.ne1 = ne1;
     pars.thetalist = thetalist;
     pars.eiglist = eiglist;
     pars.P = P;
     %% Loop over the discreet set
     app_err_sGAP=zeros(Ntrain,1);
-    if flag_PC==1
-        parfor ii=1:Ntrain
-            [app_err_sGAP(ii)] = approximation_SG_d(mu_t(:,ii),pars);
-        end
-    end
-    if flag_PC==0
-        for ii=1:Ntrain
-            [app_err_sGAP(ii)] = approximation_SG_d(mu_t(:,ii),pars);
-        end
+    parfor ii=1:Ntrain
+        [app_err_sGAP(ii)] = approximation_SG_d(mu_t(:,ii),pars);
     end
     %% Compute the maximal value of the surrogate error
     [f,ind]=max(app_err_sGAP); mu=mu_t(:,ind);
@@ -267,7 +263,7 @@ while (curerror > tol)
                 break
             end
         end
-
+        ne1(iter)=ne(iter);
         for ii=(ne(iter)+2):size(D,2)
             if abs(D((ii),(ii))-D((ne(iter)+1),(ne(iter)+1)))> options.RSG_tol
                 ne(iter)=ii-1;
@@ -277,6 +273,7 @@ while (curerror > tol)
         ne(iter)=ne(iter);
         [V,D] = eigs(Amu,20*(ne(iter)+1),'smallestreal',opts);
         Pext = V(:,1:ne(iter));
+        Pext1 = V(:,1:ne1(iter));
         eiglist{iter} = diag(D(1:ne(iter)+1,1:ne(iter)+1));
        
     else
@@ -284,50 +281,55 @@ while (curerror > tol)
         [V,D] = eig(Amu);
         [eigAj,inds] = sort(diag(D));
         for i=1:n
-           if abs((eigAj(i)- eigAj(i+1)))>options.RSG_tol 
+           if abs((eigAj(i)- eigAj(i+1)))>options.RSG_tol %Check if expression is corrected
                ne(iter)=i+1;
                GAP = eigAj(i)- eigAj(i+1);
                break
            end
         end
+        ne1(iter)=ne(iter);
         for i=ne(iter):n
-           if abs((eigAj(ne(iter))- eigAj(i+1)))>options.RSG_tol
+           if abs((eigAj(ne(iter))- eigAj(i+1)))>options.RSG_tol %Check if expression is corrected
                ne(iter)=i;
                break
            end
         end
-        Pext = V(:,inds(1:ne(iter))); eiglist{iter} = diag(D(1:ne(iter)+1,1:ne(iter)+1));
+        Pext = V(:,inds(1:ne(iter)));  Pext1 = V(:,inds(1:ne1(iter))); eiglist{iter} = diag(D(1:ne(iter)+1,1:ne(iter)+1));
         
     end
 
     ERR_GAP(iter)= abs(GAP-GAP_RED)/GAP_RED;
     
     pars.eigvecs{iter} =  Pext;
+    pars.eigvecs1{iter} =  Pext1;
     Pold=P;
-    Pext2=Pext;
+    Pext2=Pext; Pnew = [];
     for jj = 1:ne(iter)
         Pext2(:,jj) = Pext2(:,jj) - P*(P'*Pext2(:,jj)); Pext2(:,jj)=Pext2(:,jj)/norm(Pext2(:,jj));
         Pext2(:,jj) = Pext2(:,jj) - P*(P'*Pext2(:,jj)); Pext2(:,jj)=Pext2(:,jj)/norm(Pext2(:,jj));
         Pext2(:,jj) = Pext2(:,jj) - P*(P'*Pext2(:,jj));
         if norm(Pext2(:,jj))>1e-15
              Pext2(:,jj)=Pext2(:,jj)/norm(Pext2(:,jj));
-             P = [P Pext2(:,jj)];
+             P = [P Pext2(:,jj)]; Pnew = [Pnew, Pext2(:,jj) ];
         end
     end
-    Pext=Pext2;
     mulist = [mulist mu];
     thetalist = [thetalist; thetanew];
     pars.mu = [pars.mu, mu];
+    Pext=Pnew;
     for j=1:(numel(pars.eigvecs)-1)
          pars.premult{j}=[pars.premult{j},pars.eigvecs{j}'*Pext];
+         pars.premult1{j}=[pars.premult1{j},pars.eigvecs1{j}'*Pext];
     end
     pars.premult{numel(pars.eigvecs)}=pars.eigvecs{numel(pars.eigvecs)}'*P;
+    pars.premult1{numel(pars.eigvecs)}=pars.eigvecs1{numel(pars.eigvecs)}'*P;
 
     iter = iter+1;
 end
 pars.ERR=ERR_GAP;
 pars.ff2=ff2; pars.mulist2=mulist2;
 Ared = AP;
+
 %% Check subspaces condtion
 pars.lambda_1_red=zeros(Ntrain_bis,1); pars.eta=zeros(Ntrain_bis,1); pars.eta_epsilon=zeros(Ntrain_bis,1);
 for ii=1:Ntrain_bis
@@ -338,8 +340,108 @@ for ii=1:Ntrain_bis
     pars.eta_epsilon(ii) = output.eta_epsilon;
 end
 cond_cho_GAP = pars.eta-pars.lambda_1_red-pars.eta_epsilon;
-l = find(cond_cho_GAP<0);
-% Lines of code to enforce the condition needs to be added here (for the
-% Eigenspace those lines are added), if l is an empty variable, as for this test problems,
-% then those lines are not necessary
+l = find(cond_cho_GAP<0); iii=1;
+
+while isempty(l)==0
+    mu=mu_t_bis(:,l(iii)); ne1(iter)=1;
+    %% Update the base, interpolation points and contraints
+    thetanew = theta(mu);
+    Amu = thetanew(1)*A{1};
+    for k = 2:kappa
+        Amu = Amu + thetanew(k)*A{k};
+    end
+    if sp==1
+        
+        [~,D] = eigs(Amu,20*(ne1(iter)+1),'smallestreal',opts); 
+        while (abs(D(1,1)-D(ne1(iter)+1,ne1(iter)+1)))<options.RSG_tol
+            ne1(iter)=ne1(iter)+1;
+        end
+        [V,D] = eigs(Amu,5*ne1(iter)+1,'smallestreal',opts);
+        Pext = V(:,1:ne1(iter));
+        eiglist{iter} = diag(D(1:ne1(iter)+1,1:ne1(iter)+1));
+       
+    else
+        
+        [V,D] = eig(Amu);
+        [eigAj,inds] = sort(diag(D));
+        for i=1:n
+           if abs((eigAj(1)- eigAj(i+1)))>options.RSG_tol 
+               ne1(iter)=i;
+               break
+           end
+        end
+        Pext = V(:,inds(1:ne1(iter))); eiglist{iter} =  diag(D(inds(1:ne1(iter)+1),inds(1:ne1(iter)+1)));
+        
+    end
+
+    pars.eigvecs1{iter} =  Pext;
+    Pold=P;
+    Pext2=Pext;
+    for jj = 1:ne1(iter)
+        Pext2(:,jj) = Pext2(:,jj) - P*(P'*Pext2(:,jj));  Pext2(:,jj) = Pext2(:,jj)/norm(Pext2(:,jj));
+        Pext2(:,jj) = Pext2(:,jj) - P*(P'*Pext2(:,jj));  Pext2(:,jj) = Pext2(:,jj)/norm(Pext2(:,jj));
+        Pext2(:,jj) = Pext2(:,jj) - P*(P'*Pext2(:,jj));
+        if norm(Pext2(:,jj))>1e-15
+             Pext2(:,jj)=Pext2(:,jj)/norm(Pext2(:,jj));
+             P = [P Pext2(:,jj)];
+        end
+    end
+    Pext=Pext2;
+    mulist = [mulist mu];
+    thetalist = [thetalist; thetanew];
+    pars.mu = [pars.mu, mu];
+    for j=1:(numel(pars.eigvecs1)-1)
+         pars.premult1{j}=[pars.premult1{j},pars.eigvecs1{j}'*Pext];
+    end
+    pars.premult1{numel(pars.eigvecs1)}=pars.eigvecs1{numel(pars.eigvecs1)}'*P;
+    iter = iter+1;
+    %% Update Areduced
+    for j = 1:kappa
+        AP{j} = P'*A{j}*P;
+    end
+    for j = 1:kappa
+        PA1{j}=A{j}*P;
+        PA2{j}=P'*A{j};
+    end
+   
+    for j=1:kappa
+        for jj=j:kappa
+            AP2{kappa*(j-1)+jj} = PA2{jj}*PA1{j};
+        end
+    end
+
+
+    for j = 1:kappa
+        for jj=1:(j-1)
+            AP2{kappa*(j-1)+jj} = AP2{kappa*(jj-1)+j}';
+        end
+    end
+
+    pars.A = AP; 
+    pars.Afull = AP2;
+    pars.AP = PA1;
+    pars.ne1 = ne1;
+    pars.thetalist = thetalist;
+    pars.eiglist = eiglist;
+    pars.P = P;
+    %% Check again over l
+    for j = 1:numel(l)
+        % Estimate EIG Error
+        [output] = lambda_eta_eps(mu_t_bis(:,l(j)),pars);
+        pars.lambda_1_red(l(j)) = output.eigr;
+        pars.eta(l(j)) = output.eta;
+        pars.eta_epsilon(l(j)) = output.eta_epsilon;
+    end
+    cond_cho_eig = pars.eta-pars.lambda_1_red-pars.eta_epsilon;
+    l = find(cond_cho_eig<0);
+end
+
+if isempty(ff2)
+    Ared = AP;
+else
+    pars.ff2=ff2;
+    pars.mulist2=mulist2;
+    Ared = AP;
+end
+
 return

@@ -1,7 +1,7 @@
 function [output] = lambda_eta_eps(mu,pars)
 
 RSG_tol=pars.RSG_tol;
-ne = pars.ne;
+ne = pars.ne1;
 alength = length(pars.A);
 thetanew = pars.theta(mu);
 APmu = thetanew(1)*pars.A{1};
@@ -31,7 +31,7 @@ for j = 1:kappa
     li = pars.eiglist{j}(1);
     lip = pars.eiglist{j}(ne(j)+1);
     
-    beta(j,1) = min(eig((Li-li*eye(ne(j))) - pars.premult{j}*pars.premult{j}'*(Li-lip*eye(ne(j)))));
+    beta(j,1) = min(eig((Li-li*eye(ne(j))) - pars.premult1{j}*pars.premult1{j}'*(Li-lip*eye(ne(j)))));
     b(j,1)=-pars.eiglist{j}(1)-beta(j,1);
 end
 %% Setting the LP constraints
